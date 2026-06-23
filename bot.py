@@ -10,8 +10,8 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from dotenv import load_dotenv
+import httpx
 
 load_dotenv()
 
@@ -179,9 +179,22 @@ async def get_contact(message: Message, state: FSMContext):
     )
 
 
+async def keep_alive():
+    """Пингует себя каждые 10 минут чтобы не засыпать на Render free tier."""
+    await asyncio.sleep(60)
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                await client.get(f"{WEBHOOK_URL}/health", timeout=10)
+            except Exception:
+                pass
+            await asyncio.sleep(600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await bot.set_webhook(f"{WEBHOOK_URL}{WEBHOOK_PATH}")
+    asyncio.create_task(keep_alive())
     yield
     await bot.delete_webhook()
 
